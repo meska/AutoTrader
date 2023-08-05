@@ -182,6 +182,20 @@ class AutoData:
                         + "the Yahoo Finance data feed."
                     )
 
+            elif data_config["data_source"].lower() == "ig":
+                username = data_config['username']
+                password = data_config['password']
+                api_key = data_config['api_key']
+                acc_type = data_config['acc_type']
+
+                try:
+                    from trading_ig import IGService
+                    from autotrader.brokers.ig.utils import Utils as IG_Utils
+                    self.api = IGService(username, password, api_key, acc_type)
+                    self.api.create_session()
+                except ImportError:
+                    raise Exception("Please install trading_ig to use the IG data feed.")
+
             elif data_config["data_source"].lower() == "local":
                 configure_local_feed(data_config)
 
@@ -1523,6 +1537,126 @@ class AutoData:
 
         return trades
 
+    def _ig(
+        self,
+        instrument: str,
+        granularity: str,
+        count: int = None,
+        start_time: datetime = None,
+        end_time: datetime = None,
+    ) -> pd.DataFrame:
+        """Retrieves historical price data of a instrument from IG Trading.
+    
+        Parameters
+        ----------
+        instrument : str
+            The instrument to fetch data for.
+        granularity : str
+            The candlestick granularity, specified as a TimeDelta string
+            (eg. '30s', '5min' or '1d').
+        count : int, optional
+            The number of candles to fetch (maximum 5000). The default is None.
+        start_time : datetime, optional
+            The data start time. The default is None.
+        end_time : datetime, optional
+            The data end time. The default is None.
+    
+        Returns
+        -------
+        data : DataFrame
+            The price data, as an OHLC DataFrame.
+    
+        Notes
+        -----
+            If a candlestick count is provided, only one of start time or end
+            time should be provided. If neither is provided, the N most
+            recent candles will be provided. If both are provided, the count
+            will be ignored, and instead the dates will be used.
+         """
+
+        gran_map = {
+            1: "1s",
+            60: "1Min",
+            120: "2Min",
+            180: "3Min",
+            300: "5Min",
+            600: "10Min",
+            900: "15Min",
+            1800: "30Min",
+            3600: "1H",
+            7200: "2H",
+            10800: "3H",
+            14400: "4H",
+            86400: "D",
+            604800: "W",
+            2419200: "M"
+        }
+        granularity = gran_map[pd.Timedelta(granularity).total_seconds()]
+    
+        if count is not None:
+            # either of count, start_time+count, end_time+count (or start_time+end_time+count)
+            # if count is provided, count must be less than 5000
+            if start_time is None and end_time is None:
+                # fetch count=N most recent candles
+                response = self.api.instrument.candles(
+                    instrument, granularity=granularity, count=count
+                )
+                data = self._response_to_df(response)
+    
+            elif start_time is not None and end_time is None:
+                # start_time + count
+                from_time = start_time.timestamp()
+                response = self.api.instrument.candles(
+                    instrument, granularity=granularity, count=count, fromTime=from_time
+                )
+                data = self._response_to_df(response)
+    
+            elif end_time is not None and start_time is None:
+                # end_time + count
+                to_time = end_time.timestamp()
+                response = self.api.instrument.candles(
+                    instrument, granularity=granularity, count=count, toTime=to_time
+                )
+                data = self._response_to_df(response)
+    
+            else:
+                # try to get data
+                response = self.api.fetch_historical_prices_by_epic_and_date_range(
+                    instrument,
+                    granularity,
+                    start_time,
+                    end_time,
+                )
+
+                data = response["prices"]["ask"]
+    
+        else:
+            # count is None
+            # Assume that both start_time and end_time have been specified.
+
+            # try to get data
+            response = self.api.fetch_historical_prices_by_epic_and_date_range(
+                instrument,
+                granularity,
+                start_time,
+                end_time,
+            )
+    
+            data = response["prices"]["ask"]
+        #TODO: check incoming timezone
+        return data.tz_localize("UTC")
+
+    def _ig_quote_data(
+        self,
+        data: pd.DataFrame,
+        pair: str = None,
+        granularity: str = None,
+        start_time: datetime = None,
+        end_time: datetime = None,
+        count: int = None,
+    ):
+        """Returns the original price data for a IG data feed."""
+        return data
     def _none(self, *args, **kwargs):
         """Dummy method for none 'data' feed"""
         return None

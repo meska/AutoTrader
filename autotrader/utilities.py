@@ -1,14 +1,16 @@
-import sys
-import yaml
-import time
 import pickle
-import autotrader
+import sys
+import time
+from datetime import datetime, timedelta
+
 import numpy as np
 import pandas as pd
+import yaml
 from art import tprint
-from datetime import datetime, timedelta
+from prometheus_client import Gauge, start_http_server
+
+import autotrader
 from autotrader.brokers.broker import AbstractBroker
-from prometheus_client import start_http_server, Gauge
 
 
 def read_yaml(file_path: str) -> dict:
@@ -241,7 +243,7 @@ def get_data_config(feed: str, global_config: dict = None, **kwargs) -> dict:
         feed, exchange = feed.lower().split(":")
 
     # Check feed
-    supported_feeds = ["oanda", "ib", "ccxt", "dydx", "yahoo", "local", "none"]
+    supported_feeds = ["oanda", "ib", "ccxt", "dydx", "yahoo", "local", "ig", "none"]
     if feed.lower() not in supported_feeds:
         raise Exception(f"Unsupported data feed: '{feed}'")
 
@@ -253,7 +255,7 @@ def get_data_config(feed: str, global_config: dict = None, **kwargs) -> dict:
             pass
 
     # Check for required authentication
-    auth_feeds = ["oanda", "ib"]
+    auth_feeds = ["oanda", "ib","ig"]
     if feed.lower() in auth_feeds and global_config is None:
         raise Exception(
             f"Data feed '{feed}' requires authentication. "
@@ -306,6 +308,11 @@ def get_data_config(feed: str, global_config: dict = None, **kwargs) -> dict:
         config["read_only"] = (
             global_config["read_only"] if "read_only" in global_config else False
         )
+    elif feed.lower() == "ig":
+       config["username"] = global_config['IG']['USERNAME']
+       config["password"] = global_config['IG']['PASSWORD']
+       config["api_key"] = global_config['IG']['API_KEY']
+       config["acc_type"] = global_config['IG']['ACC_TYPE']
 
     elif feed.lower() == "ccxt":
         # Try add authentication with global config
@@ -517,9 +524,11 @@ class TradeAnalysis:
 
             # Save result
             position_histories_dict[instrument] = net_position_hist
-
-        position_histories = pd.concat(position_histories_dict, axis=1)
-        return position_histories
+        if position_histories_dict:
+            position_histories = pd.concat(position_histories_dict, axis=1)
+            return position_histories
+        else:
+            return None
 
     @staticmethod
     def _create_position_summary(open_positions, closed_positions):

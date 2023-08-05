@@ -1093,7 +1093,7 @@ class AutoTrader:
                         + "AutoTrader.add_data()."
                     )
 
-            elif global_config is None and self._feed.lower() in ["oanda", "ib"]:
+            elif global_config is None and self._feed.lower() in ["oanda", "ib","ig"]:
                 # No global configuration provided, but data feed requires authentication
                 print(
                     f'Data feed "{self._feed}" requires global '
