@@ -1,12 +1,15 @@
 import os
 import time
-import pandas as pd
-from typing import Union
-from decimal import Decimal
-from autotrader.brokers.trading import Order
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
+from typing import Union
+
+import pandas as pd
+from slugify import slugify
+
 from autotrader.brokers.broker_utils import OrderBook
+from autotrader.brokers.trading import Order
 
 try:
     import ccxt
@@ -183,18 +186,21 @@ class AutoData:
                     )
 
             elif data_config["data_source"].lower() == "ig":
-                username = data_config['username']
-                password = data_config['password']
-                api_key = data_config['api_key']
-                acc_type = data_config['acc_type']
+                username = data_config["username"]
+                password = data_config["password"]
+                api_key = data_config["api_key"]
+                acc_type = data_config["acc_type"]
 
                 try:
                     from trading_ig import IGService
                     from autotrader.brokers.ig.utils import Utils as IG_Utils
+
                     self.api = IGService(username, password, api_key, acc_type)
                     self.api.create_session()
                 except ImportError:
-                    raise Exception("Please install trading_ig to use the IG data feed.")
+                    raise Exception(
+                        "Please install trading_ig to use the IG data feed."
+                    )
 
             elif data_config["data_source"].lower() == "local":
                 configure_local_feed(data_config)
@@ -1546,7 +1552,7 @@ class AutoData:
         end_time: datetime = None,
     ) -> pd.DataFrame:
         """Retrieves historical price data of a instrument from IG Trading.
-    
+
         Parameters
         ----------
         instrument : str
@@ -1560,19 +1566,19 @@ class AutoData:
             The data start time. The default is None.
         end_time : datetime, optional
             The data end time. The default is None.
-    
+
         Returns
         -------
         data : DataFrame
             The price data, as an OHLC DataFrame.
-    
+
         Notes
         -----
             If a candlestick count is provided, only one of start time or end
             time should be provided. If neither is provided, the N most
             recent candles will be provided. If both are provided, the count
             will be ignored, and instead the dates will be used.
-         """
+        """
 
         gran_map = {
             1: "1s",
@@ -1589,20 +1595,19 @@ class AutoData:
             14400: "4H",
             86400: "D",
             604800: "W",
-            2419200: "M"
+            2419200: "M",
         }
         granularity = gran_map[pd.Timedelta(granularity).total_seconds()]
-    
+
         if count is not None:
             # either of count, start_time+count, end_time+count (or start_time+end_time+count)
-            # if count is provided, count must be less than 5000
             if start_time is None and end_time is None:
                 # fetch count=N most recent candles
                 response = self.api.instrument.candles(
                     instrument, granularity=granularity, count=count
                 )
                 data = self._response_to_df(response)
-    
+
             elif start_time is not None and end_time is None:
                 # start_time + count
                 from_time = start_time.timestamp()
@@ -1610,7 +1615,7 @@ class AutoData:
                     instrument, granularity=granularity, count=count, fromTime=from_time
                 )
                 data = self._response_to_df(response)
-    
+
             elif end_time is not None and start_time is None:
                 # end_time + count
                 to_time = end_time.timestamp()
@@ -1618,32 +1623,34 @@ class AutoData:
                     instrument, granularity=granularity, count=count, toTime=to_time
                 )
                 data = self._response_to_df(response)
-    
+
             else:
                 # try to get data
-                response = self.api.fetch_historical_prices_by_epic_and_date_range(
-                    instrument,
-                    granularity,
-                    start_time,
-                    end_time,
-                )
+                return self._ig_fetch(instrument, granularity, start_time, end_time)
 
-                data = response["prices"]["ask"]
-    
         else:
             # count is None
             # Assume that both start_time and end_time have been specified.
+            return self._ig_fetch(instrument, granularity, start_time, end_time)
 
-            # try to get data
+
+
+    def _ig_fetch(self, instrument, granularity, start_time, end_time):
+        """Fetches data between two dates with cache."""
+
+        data_file = f"cache/{slugify(instrument)}.{slugify(granularity)}.{round(start_time.timestamp())}.{round(end_time.timestamp())}.feather".lower()
+        if os.path.exists(data_file):
+            df_ask = pd.read_feather(data_file)
+            data = df_ask.set_index("DateTime")
+        else:
             response = self.api.fetch_historical_prices_by_epic_and_date_range(
                 instrument,
                 granularity,
                 start_time,
                 end_time,
             )
-    
             data = response["prices"]["ask"]
-        #TODO: check incoming timezone
+            data.reset_index().to_feather(data_file)
         return data.tz_localize("UTC")
 
     def _ig_quote_data(
@@ -1657,6 +1664,7 @@ class AutoData:
     ):
         """Returns the original price data for a IG data feed."""
         return data
+
     def _none(self, *args, **kwargs):
         """Dummy method for none 'data' feed"""
         return None

@@ -1,29 +1,24 @@
+import importlib
 import os
+import pickle
 import sys
 import time
-import pickle
 import timeit
-import importlib
 import traceback
+from ast import literal_eval
+from datetime import datetime, timedelta, timezone
+from threading import Thread
+from typing import Callable
+
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
-from typing import Callable
-from threading import Thread
-from ast import literal_eval
 from scipy.optimize import brute
-from autotrader.autoplot import AutoPlot
+from tqdm import tqdm
+
 from autotrader.autobot import AutoTraderBot
-from datetime import datetime, timedelta, timezone
+from autotrader.autoplot import AutoPlot
 from autotrader.brokers.broker import AbstractBroker
-from autotrader.utilities import (
-    read_yaml,
-    get_broker_config,
-    DataStream,
-    TradeAnalysis,
-    unpickle_broker,
-    print_banner,
-)
+from autotrader.utilities import (DataStream, TradeAnalysis, get_broker_config, print_banner, read_yaml, unpickle_broker)
 
 
 class AutoTrader:
@@ -1093,7 +1088,7 @@ class AutoTrader:
                         + "AutoTrader.add_data()."
                     )
 
-            elif global_config is None and self._feed.lower() in ["oanda", "ib","ig"]:
+            elif global_config is None and self._feed.lower() in ["oanda", "ib", "ig"]:
                 # No global configuration provided, but data feed requires authentication
                 print(
                     f'Data feed "{self._feed}" requires global '

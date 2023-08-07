@@ -1,23 +1,24 @@
 # import os
-import numpy as np
-import pandas as pd
-from math import pi
 from typing import Union
 
-from bokeh.models.annotations import Title
-from bokeh.plotting import figure, output_file, show
-from bokeh.io import output_notebook, curdoc
-from bokeh.models import (
-    CustomJS,
-    ColumnDataSource,
-    HoverTool,
-    CrosshairTool,
-    Span,
-    CustomJSTransform,
-)
+import numpy as np
+import pandas as pd
+from bokeh.io import curdoc, output_notebook
 from bokeh.layouts import gridplot, layout
-from bokeh.transform import factor_cmap, cumsum, transform
+from bokeh.models import (
+    ColumnDataSource,
+    CrosshairTool,
+    CustomJS,
+    CustomJSTransform,
+    HoverTool,
+    Span,
+)
+from bokeh.models.annotations import Title
 from bokeh.palettes import Category20c, Turbo256
+from bokeh.plotting import figure, output_file, show
+from bokeh.transform import cumsum, factor_cmap, transform
+from math import pi
+
 from autotrader.utilities import TradeAnalysis
 
 try:
@@ -925,7 +926,7 @@ class AutoPlot:
                                 right_index=True,
                             )
                             line_data = merged_indicator_data[
-                                indicators[indicator]["data"].name
+                                indicators[indicator]["data"].name + "_y"
                             ]
                             x_vals = line_data.index
                             y_vals = line_data.values
@@ -954,7 +955,6 @@ class AutoPlot:
                         new_fig.title = indicator
 
                     elif indi_type == "Heikin-Ashi":
-
                         HA_data = self._reindex_data(indicators[indicator]["data"])
                         source = ColumnDataSource(HA_data)
                         source.add(
@@ -1872,7 +1872,6 @@ class AutoPlot:
         return fig
 
     def _plot_pie(self, source, fig_title=None, fig_height=250):
-
         pie = figure(
             title=fig_title,
             toolbar_location=None,
@@ -1954,8 +1953,11 @@ class AutoPlot:
             fig = linked_fig
 
         # Charting on different timeframe data
-        lower_band = self._merge_data(plot_data["lower"], name="lower")["lower"]
-        upper_band = self._merge_data(plot_data["upper"], name="upper")["upper"]
+        lower = self._merge_data(plot_data["lower"], name="lower")
+        lower_band = lower[lower.columns[-1]]
+
+        upper = self._merge_data(plot_data["upper"], name="upper")
+        upper_band = upper[upper.columns[-1]]
 
         fig.varea(
             lower_band.index,

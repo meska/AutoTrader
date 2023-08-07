@@ -255,7 +255,7 @@ def get_data_config(feed: str, global_config: dict = None, **kwargs) -> dict:
             pass
 
     # Check for required authentication
-    auth_feeds = ["oanda", "ib","ig"]
+    auth_feeds = ["oanda", "ib", "ig"]
     if feed.lower() in auth_feeds and global_config is None:
         raise Exception(
             f"Data feed '{feed}' requires authentication. "
@@ -309,10 +309,10 @@ def get_data_config(feed: str, global_config: dict = None, **kwargs) -> dict:
             global_config["read_only"] if "read_only" in global_config else False
         )
     elif feed.lower() == "ig":
-       config["username"] = global_config['IG']['USERNAME']
-       config["password"] = global_config['IG']['PASSWORD']
-       config["api_key"] = global_config['IG']['API_KEY']
-       config["acc_type"] = global_config['IG']['ACC_TYPE']
+        config["username"] = global_config["IG"]["IG_SERVICE_USERNAME"]
+        config["password"] = global_config["IG"]["IG_SERVICE_PASSWORD"]
+        config["api_key"] = global_config["IG"]["IG_SERVICE_API_KEY"]
+        config["acc_type"] = global_config["IG"]["IG_SERVICE_ACC_TYPE"]
 
     elif feed.lower() == "ccxt":
         # Try add authentication with global config
